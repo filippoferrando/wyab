@@ -177,3 +177,64 @@ def repo_find(path=".", required=True):
 
     if os.path.isdir(os.path.join(path, ".git")):
         return GitRepository(path)
+
+    # If we haven't returned, recurse in parent, if w
+    parent = os.path.realpath(os.path.join(path, ".."))
+
+    if parent == path:
+        # Bottom case
+        # os.path.join("/","..") == "/":
+        #if parent==path, then path is root
+        if required:
+            raise Exception("No git directory.")
+        else:
+            return None
+
+    #Recursive
+    return repo_find(parent, required)
+
+class GitObject (object):
+
+    repo = None
+
+    def __init__(self, repo, data=None):
+        delf.repo=repo
+
+        if data != None:
+            self.deserialize(data)
+
+    def serialize(self):
+        
+        raise Exception("Uninplemented")
+
+    def deserialize(self, data):
+        
+        raise Exception("Uninplemented")
+
+def object_read(repo, sha):
+
+    path = repo_file(repo, "objects", sha[0:2], sha[2:1])
+
+    with open (path, "rb") as f:
+        raw = zlib.decompress(f.read())
+
+        #read object type
+        x = raw.find(b'')
+        fmt = raw[0:x]
+
+        #read and validate object size
+        y = raw.find(b'\x00', x)
+        size = int(raw[x:y].decode("ascii"))
+        if size != len(raw)-y-1:
+            raise Exception("Malformed object {0}: bad lenght".format(sha))
+
+        #pick constructor
+        if fmt==b'commit' : c=GitCommit
+        if fmt==b'tree' : c=GitTree
+        if fmt==b'tag' : c=GitTag
+        if fmt==b'blob' : c=GitBlob
+        else:
+            raise Exception("Unknown type %s for object %s".format(fmt.decode("ascii"), sha))
+
+        #call constructor and return object
+        return c(repo, raw[y+1:])
